@@ -1,6 +1,6 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { ShieldCheck } from "@medusajs/icons"
-import { Badge, Container, Heading, Table, Text } from "@medusajs/ui"
+import { Badge, Container, Heading, Select, Table, Text } from "@medusajs/ui"
 import { useEffect, useState } from "react"
 
 type AgeVerificationRecord = {
@@ -20,6 +20,16 @@ type OrderRow = {
   created_at: string
   age_verification: AgeVerificationRecord | null
 }
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  { value: "not_required", label: "Not required" },
+  { value: "pending", label: "Pending" },
+  { value: "verified", label: "Verified" },
+  { value: "low_risk", label: "Low risk" },
+  { value: "high_risk", label: "High risk" },
+  { value: "failed", label: "Failed" },
+]
 
 const STATUS_COLORS: Record<string, "grey" | "orange" | "green" | "red"> = {
   not_required: "grey",
@@ -41,20 +51,38 @@ const formatMoney = (total: number, currencyCode: string) =>
 const AgeVerificationPage = () => {
   const [rows, setRows] = useState<OrderRow[]>([])
   const [loaded, setLoaded] = useState(false)
+  const [statusFilter, setStatusFilter] = useState("all")
 
   useEffect(() => {
-    fetch("/admin/age-verification/orders?limit=50", { credentials: "include" })
+    setLoaded(false)
+    const params = new URLSearchParams({ limit: "50" })
+    if (statusFilter !== "all") {
+      params.set("status", statusFilter)
+    }
+    fetch(`/admin/age-verification/orders?${params.toString()}`, { credentials: "include" })
       .then((response) => response.json())
       .then((json) => {
         setRows(json.orders ?? [])
         setLoaded(true)
       })
-  }, [])
+  }, [statusFilter])
 
   return (
     <Container className="divide-y p-0">
       <div className="flex items-center justify-between px-6 py-4">
         <Heading level="h2">Age Verification</Heading>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select.Trigger className="w-48">
+            <Select.Value placeholder="Filter by status" />
+          </Select.Trigger>
+          <Select.Content>
+            {STATUS_OPTIONS.map((option) => (
+              <Select.Item key={option.value} value={option.value}>
+                {option.label}
+              </Select.Item>
+            ))}
+          </Select.Content>
+        </Select>
       </div>
       <Table>
         <Table.Header>
@@ -96,7 +124,7 @@ const AgeVerificationPage = () => {
       {loaded && rows.length === 0 && (
         <div className="px-6 py-8 text-center">
           <Text size="small" className="text-ui-fg-subtle">
-            No orders yet.
+            No orders match this filter.
           </Text>
         </div>
       )}
@@ -107,6 +135,7 @@ const AgeVerificationPage = () => {
 export const config = defineRouteConfig({
   label: "Age Verification",
   icon: ShieldCheck,
+  nested: "/orders",
 })
 
 export default AgeVerificationPage

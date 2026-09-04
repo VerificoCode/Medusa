@@ -12,6 +12,9 @@ import type AgeVerificationModuleService from "../../../../modules/age-verificat
  * rather than a raw Query call, because computed fields like
  * payment_status/fulfillment_status are decorated by this workflow and
  * aren't resolvable through Query directly.
+ *
+ * Supports filtering by `?status=` (one of the AgeVerificationStatus values,
+ * including "not_required" for orders with no verification record at all).
  */
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   const ageVerificationModuleService: AgeVerificationModuleService = req.scope.resolve(
@@ -20,6 +23,33 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
 
   const limit = Number(req.query.limit ?? 20)
   const offset = Number(req.query.offset ?? 0)
+  const status = typeof req.query.status === "string" ? req.query.status : undefined
+
+  const variables: Record<string, unknown> = {
+    is_draft_order: false,
+    skip: offset,
+    take: limit,
+    order: { created_at: "DESC" },
+  }
+
+  if (status && status !== "not_required") {
+    const matching = await ageVerificationModuleService.listAgeVerifications({ status })
+    const orderIds = matching.map((record) => record.order_id)
+
+    if (!orderIds.length) {
+      res.json({ orders: [], count: 0, limit, offset })
+      return
+    }
+
+    variables.id = orderIds
+  } else if (status === "not_required") {
+    const withRecord = await ageVerificationModuleService.listAgeVerifications({})
+    const orderIds = withRecord.map((record) => record.order_id)
+
+    if (orderIds.length) {
+      variables.id = { $nin: orderIds }
+    }
+  }
 
   const { result } = await getOrdersListWorkflow(req.scope).run({
     input: {
@@ -34,12 +64,7 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
         "total",
         "created_at",
       ],
-      variables: {
-        is_draft_order: false,
-        skip: offset,
-        take: limit,
-        order: { created_at: "DESC" },
-      },
+      variables,
     },
   })
 
