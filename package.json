@@ -36,6 +36,7 @@
   "devDependencies": {
     "@medusajs/admin-sdk": "2.20.1",
     "@medusajs/cli": "2.20.1",
+    "@medusajs/core-flows": "2.20.1",
     "@medusajs/eslint-plugin": "2.20.1",
     "@medusajs/framework": "2.20.1",
     "@medusajs/icons": "2.20.1",
@@ -59,6 +60,7 @@
   "peerDependencies": {
     "@medusajs/admin-sdk": "2.20.1",
     "@medusajs/cli": "2.20.1",
+    "@medusajs/core-flows": "2.20.1",
     "@medusajs/framework": "2.20.1",
     "@medusajs/icons": "2.20.1",
     "@medusajs/medusa": "2.20.1",

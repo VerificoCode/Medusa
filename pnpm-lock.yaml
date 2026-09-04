@@ -14,6 +14,9 @@ importers:
       '@medusajs/cli':
         specifier: 2.20.1
         version: 2.20.1(@types/node@20.19.43)
+      '@medusajs/core-flows':
+        specifier: 2.20.1
+        version: 2.20.1(@medusajs/framework@2.20.1(@medusajs/cli@2.20.1(@types/node@20.19.43))(@types/node@20.19.43)(ioredis@5.11.1)(vite@7.3.6(@types/node@20.19.43)(jiti@2.7.0)(yaml@2.9.0))(zod@4.2.0))
       '@medusajs/eslint-plugin':
         specifier: 2.20.1
         version: 2.20.1(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
