@@ -1,6 +1,6 @@
 import { defineRouteConfig } from "@medusajs/admin-sdk"
 import { ShieldCheck } from "@medusajs/icons"
-import { Badge, Container, Heading, Select, Table, Text } from "@medusajs/ui"
+import { Badge, Container, Heading, Input, Select, Table, Text } from "@medusajs/ui"
 import { useEffect, useState } from "react"
 
 type AgeVerificationRecord = {
@@ -52,6 +52,14 @@ const AgeVerificationPage = () => {
   const [rows, setRows] = useState<OrderRow[]>([])
   const [loaded, setLoaded] = useState(false)
   const [statusFilter, setStatusFilter] = useState("all")
+  const [searchInput, setSearchInput] = useState("")
+  const [search, setSearch] = useState("")
+
+  // Debounce the search box so it doesn't refetch on every keystroke.
+  useEffect(() => {
+    const timeout = setTimeout(() => setSearch(searchInput), 300)
+    return () => clearTimeout(timeout)
+  }, [searchInput])
 
   useEffect(() => {
     setLoaded(false)
@@ -59,30 +67,42 @@ const AgeVerificationPage = () => {
     if (statusFilter !== "all") {
       params.set("status", statusFilter)
     }
+    if (search) {
+      params.set("q", search)
+    }
     fetch(`/admin/age-verification/orders?${params.toString()}`, { credentials: "include" })
       .then((response) => response.json())
       .then((json) => {
         setRows(json.orders ?? [])
         setLoaded(true)
       })
-  }, [statusFilter])
+  }, [statusFilter, search])
 
   return (
     <Container className="divide-y p-0">
       <div className="flex items-center justify-between px-6 py-4">
         <Heading level="h2">Age Verification</Heading>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <Select.Trigger className="w-48">
-            <Select.Value placeholder="Filter by status" />
-          </Select.Trigger>
-          <Select.Content>
-            {STATUS_OPTIONS.map((option) => (
-              <Select.Item key={option.value} value={option.value}>
-                {option.label}
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select>
+        <div className="flex items-center gap-x-2">
+          <Input
+            type="search"
+            placeholder="Search orders"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            className="w-64"
+          />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select.Trigger className="w-48">
+              <Select.Value placeholder="Filter by status" />
+            </Select.Trigger>
+            <Select.Content>
+              {STATUS_OPTIONS.map((option) => (
+                <Select.Item key={option.value} value={option.value}>
+                  {option.label}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select>
+        </div>
       </div>
       <Table>
         <Table.Header>

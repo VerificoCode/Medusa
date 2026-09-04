@@ -1,5 +1,6 @@
 import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { getOrdersListWorkflow } from "@medusajs/core-flows"
+import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { AGE_VERIFICATION_MODULE } from "../../../../modules/age-verification"
 import type AgeVerificationModuleService from "../../../../modules/age-verification/service"
 
@@ -8,22 +9,30 @@ import type AgeVerificationModuleService from "../../../../modules/age-verificat
  * verification status joined in - the data source for the admin
  * "Age Verification" page's order table.
  *
- * Uses the same getOrdersListWorkflow the core /admin/orders route uses,
- * rather than a raw Query call, because computed fields like
- * payment_status/fulfillment_status are decorated by this workflow and
- * aren't resolvable through Query directly.
+ * Uses the same getOrdersListWorkflow the core /admin/orders route uses to
+ * get payment_status/fulfillment_status, since those are computed by the
+ * workflow itself and aren't resolvable through Query directly. The
+ * workflow's `variables` only reliably filters by `id` in practice (its `q`
+ * search parameter appears to require the core route's own request
+ * pipeline to do something with it that isn't reproducible by passing `q`
+ * straight through - it silently no-ops here), so free-text search is
+ * resolved separately via Query first, then intersected into an `id` filter
+ * that's passed to the workflow.
  *
  * Supports filtering by `?status=` (one of the AgeVerificationStatus values,
- * including "not_required" for orders with no verification record at all).
+ * including "not_required" for orders with no verification record at all)
+ * and `?q=` (searches customer email).
  */
 export async function GET(req: MedusaRequest, res: MedusaResponse) {
   const ageVerificationModuleService: AgeVerificationModuleService = req.scope.resolve(
     AGE_VERIFICATION_MODULE
   )
+  const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
 
   const limit = Number(req.query.limit ?? 20)
   const offset = Number(req.query.offset ?? 0)
   const status = typeof req.query.status === "string" ? req.query.status : undefined
+  const q = typeof req.query.q === "string" && req.query.q.length ? req.query.q : undefined
 
   const variables: Record<string, unknown> = {
     is_draft_order: false,
@@ -32,38 +41,46 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
     order: { created_at: "DESC" },
   }
 
-  if (status && status !== "not_required") {
-    const matching = await ageVerificationModuleService.listAgeVerifications({ status })
-    const orderIds = matching.map((record) => record.order_id)
+  let matchingIds: string[] | undefined
 
-    if (!orderIds.length) {
+  if (q) {
+    const { data: matches } = await query.graph({
+      entity: "order",
+      fields: ["id"],
+      filters: { email: { $ilike: `%${q}%` } },
+    })
+    matchingIds = matches.map((order) => order.id)
+  }
+
+  if (status && status !== "not_required") {
+    const matchingStatus = await ageVerificationModuleService.listAgeVerifications({ status })
+    const statusOrderIds = new Set(matchingStatus.map((record) => record.order_id))
+    matchingIds = matchingIds
+      ? matchingIds.filter((id) => statusOrderIds.has(id))
+      : Array.from(statusOrderIds)
+  } else if (status === "not_required") {
+    const withRecord = await ageVerificationModuleService.listAgeVerifications({})
+    const excludedOrderIds = new Set(withRecord.map((record) => record.order_id))
+    matchingIds = matchingIds
+      ? matchingIds.filter((id) => !excludedOrderIds.has(id))
+      : undefined
+
+    if (!matchingIds && excludedOrderIds.size) {
+      variables.id = { $nin: Array.from(excludedOrderIds) }
+    }
+  }
+
+  if (matchingIds) {
+    if (!matchingIds.length) {
       res.json({ orders: [], count: 0, limit, offset })
       return
     }
-
-    variables.id = orderIds
-  } else if (status === "not_required") {
-    const withRecord = await ageVerificationModuleService.listAgeVerifications({})
-    const orderIds = withRecord.map((record) => record.order_id)
-
-    if (orderIds.length) {
-      variables.id = { $nin: orderIds }
-    }
+    variables.id = matchingIds
   }
 
   const { result } = await getOrdersListWorkflow(req.scope).run({
     input: {
-      fields: [
-        "id",
-        "display_id",
-        "email",
-        "status",
-        "+payment_status",
-        "+fulfillment_status",
-        "currency_code",
-        "total",
-        "created_at",
-      ],
+      fields: ["id", "display_id", "email", "status", "currency_code", "total", "created_at"],
       variables,
     },
   })
