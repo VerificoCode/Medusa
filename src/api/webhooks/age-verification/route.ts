@@ -32,12 +32,18 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
 
   const signatureHeader = req.headers["x-verifico-signature"]
   const signature = Array.isArray(signatureHeader) ? signatureHeader[0] : signatureHeader
-  const rawBody =
-    (req as unknown as { rawBody?: Buffer }).rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}))
+
+  if (!req.rawBody) {
+    // Requires `bodyParser: { preserveRawBody: true }` on this route - see
+    // src/api/middlewares.ts. Without the true raw bytes, a signature check
+    // can never reliably match what Verifico actually signed.
+    res.status(500).json({ message: "Raw request body is not available for signature verification" })
+    return
+  }
 
   let isValid: boolean
   try {
-    isValid = await ageVerificationModuleService.verifyWebhookSignature(rawBody, signature)
+    isValid = await ageVerificationModuleService.verifyWebhookSignature(req.rawBody, signature)
   } catch (error) {
     res.status(500).json({ message: (error as Error).message })
     return
