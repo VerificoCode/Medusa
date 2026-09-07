@@ -1,4 +1,4 @@
-import type { AuthenticatedMedusaRequest, MedusaResponse } from "@medusajs/framework/http"
+import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { ContainerRegistrationKeys } from "@medusajs/framework/utils"
 import { AGE_VERIFICATION_MODULE } from "../../../../../modules/age-verification"
 import type AgeVerificationModuleService from "../../../../../modules/age-verification/service"
@@ -8,11 +8,15 @@ import type AgeVerificationModuleService from "../../../../../modules/age-verifi
  * page to hand to the Verifico widget - equivalent to the `acTransaction`
  * JS object the WordPress plugin echoed on `checkout/order-received`.
  *
- * Restricted to the authenticated customer who placed the order (see
- * `src/api/middlewares.ts`), unlike the original which relied on the page
- * itself being private.
+ * Open by order id + publishable key, same as core's own
+ * `/store/orders/:id` - not restricted to a logged-in customer, because
+ * guest checkout has no customer session and the confirmation page still
+ * needs this. This matches the security posture the rest of the storefront
+ * already relies on for order confirmation (the order id itself is the
+ * bearer capability), rather than introducing a stricter, inconsistent
+ * requirement for this one route.
  */
-export async function GET(req: AuthenticatedMedusaRequest, res: MedusaResponse) {
+export async function GET(req: MedusaRequest, res: MedusaResponse) {
   const { id } = req.params
   const query = req.scope.resolve(ContainerRegistrationKeys.QUERY)
   const ageVerificationModuleService: AgeVerificationModuleService = req.scope.resolve(
@@ -26,7 +30,6 @@ export async function GET(req: AuthenticatedMedusaRequest, res: MedusaResponse) 
       "id",
       "display_id",
       "email",
-      "customer_id",
       "metadata",
       "billing_address.first_name",
       "billing_address.last_name",
@@ -48,7 +51,7 @@ export async function GET(req: AuthenticatedMedusaRequest, res: MedusaResponse) 
 
   const order = orders[0]
 
-  if (!order || order.customer_id !== req.auth_context?.actor_id) {
+  if (!order) {
     res.status(404).json({ message: "Order not found" })
     return
   }
