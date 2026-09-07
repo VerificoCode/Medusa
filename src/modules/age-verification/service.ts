@@ -2,7 +2,17 @@ import crypto from "node:crypto"
 import { MedusaError, MedusaService } from "@medusajs/framework/utils"
 import type { MedusaContainer } from "@medusajs/framework/types"
 import AgeVerification from "./models/age-verification"
-import type { AgeVerificationModuleOptions } from "./types"
+import AgeVerificationSettings from "./models/age-verification-settings"
+import type { AgeVerificationMode, AgeVerificationModuleOptions } from "./types"
+
+type ResolvedSettings = {
+  domain: string
+  widgetBaseUrl: string
+  widgetVersion: string
+  mode: AgeVerificationMode
+  categoryIds: string[]
+  webhookSecretConfigured: boolean
+}
 
 type ProductLike = {
   metadata?: Record<string, unknown> | null
@@ -40,6 +50,7 @@ type OrderLike = {
 
 class AgeVerificationModuleService extends MedusaService({
   AgeVerification,
+  AgeVerificationSettings,
 }) {
   protected options_: AgeVerificationModuleOptions
 
@@ -48,12 +59,67 @@ class AgeVerificationModuleService extends MedusaService({
     this.options_ = options
   }
 
-  async getWidgetConfig() {
+  /**
+   * The saved settings row, if the admin Settings > Age Verification page
+   * has ever been submitted. There's only ever one (or zero) rows.
+   */
+  async getSettingsRecord() {
+    const [record] = await this.listAgeVerificationSettings({}, { take: 1 })
+    return record ?? null
+  }
+
+  /**
+   * Merges the saved settings row over the plugin's static `medusa-config.ts`
+   * options - any field left unset (null) in the DB row falls back to the
+   * option, so the module keeps working with zero rows saved. The webhook
+   * secret is deliberately excluded: it's a credential, so it stays
+   * env/options-only rather than round-tripping through the admin UI.
+   */
+  async resolveSettings(): Promise<ResolvedSettings> {
+    const record = await this.getSettingsRecord()
+
     return {
-      domain: this.options_.domain,
-      widgetBaseUrl: this.options_.widgetBaseUrl ?? "https://agechecked.verifico.io",
-      widgetVersion: this.options_.widgetVersion ?? "2_0_0",
+      domain: record?.domain || this.options_.domain,
+      widgetBaseUrl:
+        record?.widget_base_url || this.options_.widgetBaseUrl || "https://agechecked.verifico.io",
+      widgetVersion: record?.widget_version || this.options_.widgetVersion || "2_0_0",
+      mode: (record?.mode as AgeVerificationMode | undefined) ?? this.options_.mode ?? "product",
+      categoryIds: (record?.category_ids as unknown as string[] | undefined) ?? this.options_.categoryIds ?? [],
+      webhookSecretConfigured: Boolean(this.options_.webhookSecret),
     }
+  }
+
+  async updateSettings(data: {
+    domain?: string | null
+    widgetBaseUrl?: string | null
+    widgetVersion?: string | null
+    mode?: AgeVerificationMode | null
+    categoryIds?: string[] | null
+  }): Promise<ResolvedSettings> {
+    const record = await this.getSettingsRecord()
+    const payload = {
+      domain: data.domain?.trim() || null,
+      widget_base_url: data.widgetBaseUrl?.trim() || null,
+      widget_version: data.widgetVersion?.trim() || null,
+      mode: data.mode || null,
+      category_ids: (data.categoryIds?.length ? data.categoryIds : null) as unknown as Record<
+        string,
+        unknown
+      > | null,
+    }
+
+    if (record) {
+      await this.updateAgeVerificationSettings({ id: record.id, ...payload })
+    } else {
+      await this.createAgeVerificationSettings(payload)
+    }
+
+    return this.resolveSettings()
+  }
+
+  async getWidgetConfig() {
+    const { domain, widgetBaseUrl, widgetVersion } = await this.resolveSettings()
+    return { domain, widgetBaseUrl, widgetVersion }
   }
 
   /**
@@ -61,18 +127,26 @@ class AgeVerificationModuleService extends MedusaService({
    * specific categories / specific products). Product-level opt-in uses
    * `product.metadata.requires_age_verification === true`, set the same way
    * the WordPress plugin used a per-product checkbox meta key.
+   *
+   * `settings` can be passed in by callers (like `buildTransactionPayload`)
+   * that already resolved it, to avoid re-querying per line item.
    */
-  async productRequiresVerification(product: ProductLike | null | undefined): Promise<boolean> {
+  async productRequiresVerification(
+    product: ProductLike | null | undefined,
+    settings?: ResolvedSettings
+  ): Promise<boolean> {
     if (!product) {
       return false
     }
 
-    switch (this.options_.mode ?? "product") {
+    const resolved = settings ?? (await this.resolveSettings())
+
+    switch (resolved.mode) {
       case "all":
         return true
       case "category":
         return (product.categories ?? []).some((category) =>
-          (this.options_.categoryIds ?? []).includes(category.id)
+          resolved.categoryIds.includes(category.id)
         )
       case "product":
       default:
@@ -81,8 +155,9 @@ class AgeVerificationModuleService extends MedusaService({
   }
 
   async orderRequiresVerification(order: OrderLike): Promise<boolean> {
+    const settings = await this.resolveSettings()
     const flags = await Promise.all(
-      (order.items ?? []).map((item) => this.productRequiresVerification(item.product))
+      (order.items ?? []).map((item) => this.productRequiresVerification(item.product, settings))
     )
     return flags.some(Boolean)
   }
@@ -93,6 +168,7 @@ class AgeVerificationModuleService extends MedusaService({
    * into the order-received page.
    */
   async buildTransactionPayload(order: OrderLike) {
+    const settings = await this.resolveSettings()
     const address = order.billing_address
     const metadataDob = order.metadata?.date_of_birth
     const dob = typeof metadataDob === "string" ? metadataDob : ""
@@ -120,7 +196,7 @@ class AgeVerificationModuleService extends MedusaService({
         name: item.title,
         price: item.unit_price,
         quantity: item.quantity,
-        requires_av: await this.productRequiresVerification(item.product),
+        requires_av: await this.productRequiresVerification(item.product, settings),
       }))
     )
 
