@@ -123,32 +123,12 @@ const AgeVerificationSettingsPage = () => {
         )}
 
         <div className="flex flex-col gap-y-2">
-          <Label size="small">Storefront domain</Label>
+          <Label size="small">Widget base URL</Label>
           <Input
-            value={settings.domain}
-            onChange={(event) => setSettings({ ...settings, domain: event.target.value })}
-            placeholder="www.example.com"
+            value={settings.widgetBaseUrl}
+            onChange={(event) => setSettings({ ...settings, widgetBaseUrl: event.target.value })}
+            placeholder="https://agechecked.verifico.io"
           />
-          <Hint>Passed to the widget script as the `domain` query param.</Hint>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-y-2">
-            <Label size="small">Widget base URL</Label>
-            <Input
-              value={settings.widgetBaseUrl}
-              onChange={(event) => setSettings({ ...settings, widgetBaseUrl: event.target.value })}
-              placeholder="https://agechecked.verifico.io"
-            />
-          </div>
-          <div className="flex flex-col gap-y-2">
-            <Label size="small">Widget version</Label>
-            <Input
-              value={settings.widgetVersion}
-              onChange={(event) => setSettings({ ...settings, widgetVersion: event.target.value })}
-              placeholder="2_0_0"
-            />
-          </div>
         </div>
 
         <div className="flex flex-col gap-y-2">
