@@ -34,6 +34,7 @@ type OrderLineItemLike = {
   id: string
   title: string
   product_id?: string | null
+  variant_sku?: string | null
   quantity: number
   unit_price: number
   product?: ProductLike | null
@@ -163,9 +164,12 @@ class AgeVerificationModuleService extends MedusaService({
   }
 
   /**
-   * Builds the customer + cart payload the Verifico widget expects, in the
-   * same shape as the `acTransaction` object the WordPress plugin injected
-   * into the order-received page.
+   * Builds the customer + cart payload the Verifico widget expects. Shape
+   * (and field types - the widget reads every product field as a string,
+   * and `cart` is an array wrapping one `{ products }` object rather than a
+   * plain object) is copied field-for-field from the WordPress plugin's
+   * `unity_orderData()`, which is what the widget was actually built
+   * against - not a "reasonable" reinterpretation of it.
    */
   async buildTransactionPayload(order: OrderLike) {
     const settings = await this.resolveSettings()
@@ -183,6 +187,7 @@ class AgeVerificationModuleService extends MedusaService({
       address: {
         address1: address?.address_1 ?? "",
         address2: address?.address_2 ?? "",
+        address3: "",
         city: address?.city ?? "",
         postcode: address?.postal_code ?? "",
         country: address?.country_code ?? "",
@@ -192,17 +197,26 @@ class AgeVerificationModuleService extends MedusaService({
 
     const products = await Promise.all(
       (order.items ?? []).map(async (item) => ({
-        id: item.product_id ?? item.id,
+        id: item.variant_sku || item.product_id || item.id,
         name: item.title,
-        price: item.unit_price,
-        quantity: item.quantity,
-        requires_av: await this.productRequiresVerification(item.product, settings),
+        // Line total (unit_price * quantity), matching WooCommerce's
+        // get_total() semantics. Medusa's own computed `total` field would be
+        // more exact (it accounts for promotions), but including it in the
+        // same Query.graph() call breaks resolution of the plain sibling
+        // fields (quantity/unit_price/variant_sku come back undefined) - not
+        // worth it for a field this route doesn't otherwise need.
+        price: String(item.unit_price * item.quantity),
+        quantity: String(item.quantity),
+        requires_av: (await this.productRequiresVerification(item.product, settings)) ? "1" : "0",
       }))
     )
 
     return {
-      user: [user],
-      cart: { products },
+      // WordPress echoed the same billing details twice here (looks like
+      // unfinished shipping-address support that was never wired up) -
+      // matched as-is in case the widget expects two entries.
+      user: [user, user],
+      cart: [{ products }],
     }
   }
 

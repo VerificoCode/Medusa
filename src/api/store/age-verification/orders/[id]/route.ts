@@ -42,7 +42,15 @@ export async function GET(req: MedusaRequest, res: MedusaResponse) {
       "items.id",
       "items.title",
       "items.product_id",
+      "items.variant_sku",
       "items.quantity",
+      // Requesting items.detail.quantity too looks redundant, but without it
+      // Medusa's remote query returns items.quantity as undefined - it's a
+      // merged/computed field that needs the OrderItem "detail" relation
+      // pulled in before it resolves, the same class of quirk as
+      // payment_status/fulfillment_status needing the full order-list
+      // workflow elsewhere in this plugin.
+      "items.detail.quantity",
       "items.unit_price",
       "items.product.metadata",
       "items.product.categories.id",
