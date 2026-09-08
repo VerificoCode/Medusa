@@ -132,15 +132,6 @@ const AgeVerificationSettingsPage = () => {
         </div>
 
         <div className="flex flex-col gap-y-2">
-          <Label size="small">Webhook secret</Label>
-          <Text size="small" className="text-ui-fg-subtle">
-            {settings.webhookSecretConfigured
-              ? "Configured via the AGE_VERIFICATION_WEBHOOK_SECRET environment variable."
-              : "Not configured - set AGE_VERIFICATION_WEBHOOK_SECRET so status callbacks are accepted."}
-          </Text>
-        </div>
-
-        <div className="flex flex-col gap-y-2">
           <Label size="small">Verify mode</Label>
           <Select
             value={settings.mode}
