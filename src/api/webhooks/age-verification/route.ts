@@ -23,6 +23,7 @@ const STATUS_MAP: Record<string, AgeVerificationStatus> = {
   high_risk: "high_risk",
   failed: "failed",
   rejected: "failed",
+  pending_age_verification: "pending_age_verification",
 }
 
 export async function POST(req: MedusaRequest, res: MedusaResponse) {

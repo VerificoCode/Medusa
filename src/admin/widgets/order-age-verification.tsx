@@ -11,11 +11,20 @@ type AgeVerificationRecord = {
   verified_at: string | null
 }
 
-const STATUS_OPTIONS = ["not_required", "pending", "verified", "low_risk", "high_risk", "failed"]
+const STATUS_OPTIONS = [
+  "not_required",
+  "pending",
+  "pending_age_verification",
+  "verified",
+  "low_risk",
+  "high_risk",
+  "failed",
+]
 
 const STATUS_COLORS: Record<string, "grey" | "orange" | "green" | "red"> = {
   not_required: "grey",
   pending: "orange",
+  pending_age_verification: "orange",
   verified: "green",
   low_risk: "green",
   high_risk: "red",

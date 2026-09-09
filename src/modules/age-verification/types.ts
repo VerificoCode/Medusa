@@ -3,6 +3,7 @@ export type AgeVerificationMode = "all" | "category" | "product"
 export type AgeVerificationStatus =
   | "not_required"
   | "pending"
+  | "pending_age_verification"
   | "verified"
   | "low_risk"
   | "high_risk"

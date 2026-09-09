@@ -54,6 +54,7 @@
           "enumItems": [
             "not_required",
             "pending",
+            "pending_age_verification",
             "verified",
             "low_risk",
             "high_risk",

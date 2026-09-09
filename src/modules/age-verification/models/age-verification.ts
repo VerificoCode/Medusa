@@ -4,7 +4,15 @@ const AgeVerification = model.define("age_verification", {
   id: model.id().primaryKey(),
   order_id: model.text(),
   status: model
-    .enum(["not_required", "pending", "verified", "low_risk", "high_risk", "failed"])
+    .enum([
+      "not_required",
+      "pending",
+      "pending_age_verification",
+      "verified",
+      "low_risk",
+      "high_risk",
+      "failed",
+    ])
     .default("pending"),
   provider: model.text().default("verifico"),
   provider_reference: model.text().nullable(),

@@ -25,6 +25,7 @@ const STATUS_FILTER_OPTIONS = [
   { value: "all", label: "All statuses" },
   { value: "not_required", label: "Not required" },
   { value: "pending", label: "Pending" },
+  { value: "pending_age_verification", label: "Pending age verification" },
   { value: "verified", label: "Verified" },
   { value: "low_risk", label: "Low risk" },
   { value: "high_risk", label: "High risk" },
@@ -37,6 +38,7 @@ type StatusColor = "grey" | "green" | "red" | "blue" | "orange" | "purple"
 const AGE_VERIFICATION_STATUS: Record<string, { label: string; color: StatusColor }> = {
   not_required: { label: "Not required", color: "grey" },
   pending: { label: "Pending", color: "orange" },
+  pending_age_verification: { label: "Pending age verification", color: "orange" },
   verified: { label: "Verified", color: "green" },
   low_risk: { label: "Low risk", color: "green" },
   high_risk: { label: "High risk", color: "red" },
