@@ -19,9 +19,19 @@ before relying on it, and adjust the mapping/signature header as needed.
 
 ## Install
 
+Published to GitHub Packages under the `VerificoCode` org, not the public npm
+registry. Add the registry mapping to the consuming app's `.npmrc`:
+
+```
+@verificocode:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+```
+
+Then install with a GitHub token (needs `read:packages` scope) available as
+`NODE_AUTH_TOKEN`:
+
 ```bash
-npm install medusa-plugin-age-verification
-# or pnpm add / yarn add
+NODE_AUTH_TOKEN=$(gh auth token) pnpm add @verificocode/medusa-plugin-age-verification
 ```
 
 Add it to `medusa-config.ts` in your Medusa application:
@@ -33,7 +43,7 @@ module.exports = defineConfig({
   // ...
   plugins: [
     {
-      resolve: "medusa-plugin-age-verification",
+      resolve: "@verificocode/medusa-plugin-age-verification",
       options: {
         domain: process.env.AGE_VERIFICATION_DOMAIN,
         webhookSecret: process.env.AGE_VERIFICATION_WEBHOOK_SECRET,
@@ -115,6 +125,26 @@ pnpm dev
 Medusa application - see the
 [plugin development docs](https://docs.medusajs.com/learn/fundamentals/plugins)
 for how to set one up and link it (`medusa plugin:add` from the test app).
+
+## Publishing
+
+1. Bump `version` in `package.json` (GitHub Packages rejects re-publishing an
+   existing version).
+2. Build and publish:
+   ```bash
+   pnpm build
+   NODE_AUTH_TOKEN=$(gh auth token) pnpm publish --no-git-checks
+   ```
+   Needs a GitHub PAT with `write:packages` scope (`gh auth token` works if
+   you're logged in with that scope). Package is private - visibility follows
+   this repo (`VerificoCode/Medusa`).
+3. Bump the version in each consuming site's `package.json` and reinstall.
+   Publishing here does **not** redeploy any site automatically - upgrade one
+   pilot site first, verify, then roll out to the rest.
+
+Pinned to `pnpm@9.12.3` (`packageManager` field) - newer pnpm (11.x) refuses
+to expand `${NODE_AUTH_TOKEN}` from a *committed* `.npmrc` for security
+reasons and errors out on publish.
 
 ## Compatibility
 

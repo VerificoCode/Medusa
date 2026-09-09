@@ -1,9 +1,16 @@
 {
-  "name": "medusa-plugin-age-verification",
+  "name": "@verificocode/medusa-plugin-age-verification",
   "version": "0.0.1",
   "description": "A starter for Medusa plugins.",
   "author": "Medusa (https://medusajs.com)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VerificoCode/Medusa.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "files": [
     ".medusa/server"
   ],
