@@ -101,6 +101,13 @@ needs two small integrations:
    set the result as `window.acTransaction` before/after the widget script
    loads, matching Verifico's expected client-side data shape.
 
+   In that payload `user[].order_id` is Medusa's `order_…` id and
+   `user[].site_transaction_ref` is the order's display number (what the
+   customer sees). Verifico keeps the display number as its transaction
+   reference and sends it back on callbacks and API calls; the plugin resolves
+   it to the order id again (`src/utils/resolve-order.ts`, which also still
+   accepts an `order_…` id for transactions created before this).
+
 ## Order metadata
 
 `buildTransactionPayload` reads date of birth from `order.metadata.date_of_birth`.
@@ -112,7 +119,12 @@ metadata under that key - Medusa has no built-in DOB field.
 An order detail widget shows the current verification status and lets an
 admin manually override it (useful while testing, or if Verifico's callback
 fails). Status can also be read/set directly via
-`GET`/`POST /admin/age-verification/orders/:id`.
+`GET`/`POST /admin/age-verification/orders/:id` (`:id` is the `order_…` id).
+
+`GET /admin/age-verification/orders/lookup?display_id=<order number>` returns
+`{ order: { id, display_id } }`: an exact lookup for Verifico's callback engine,
+which holds the display number and needs the id for every other admin call.
+The core order list's `q` search only matches the number as a substring.
 
 ## Development
 

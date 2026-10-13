@@ -170,6 +170,11 @@ class AgeVerificationModuleService extends MedusaService({
    * plain object) is copied field-for-field from the WordPress plugin's
    * `unity_orderData()`, which is what the widget was actually built
    * against - not a "reasonable" reinterpretation of it.
+   *
+   * Identifiers: `order_id` is Medusa's `order_…` id; `site_transaction_ref`
+   * is the display number the customer sees. Verifico keeps the latter as
+   * the transaction reference and sends it back on callbacks, which
+   * `resolveOrder` turns into the id again.
    */
   async buildTransactionPayload(order: OrderLike) {
     const settings = await this.resolveSettings()
@@ -182,7 +187,7 @@ class AgeVerificationModuleService extends MedusaService({
       firstname: address?.first_name ?? "",
       lastname: address?.last_name ?? "",
       phone: address?.phone ?? "",
-      order_id: String(order.display_id ?? order.id),
+      order_id: order.id,
       dob,
       address: {
         address1: address?.address_1 ?? "",
@@ -192,7 +197,7 @@ class AgeVerificationModuleService extends MedusaService({
         postcode: address?.postal_code ?? "",
         country: address?.country_code ?? "",
       },
-      site_transaction_ref: order.id,
+      site_transaction_ref: String(order.display_id ?? order.id),
     }
 
     const products = await Promise.all(
