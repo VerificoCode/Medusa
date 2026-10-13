@@ -2,6 +2,7 @@ import type { MedusaRequest, MedusaResponse } from "@medusajs/framework/http"
 import { AGE_VERIFICATION_MODULE } from "../../../modules/age-verification"
 import type AgeVerificationModuleService from "../../../modules/age-verification/service"
 import type { AgeVerificationStatus } from "../../../modules/age-verification/types"
+import { resolveOrder } from "../../../utils/resolve-order"
 import setAgeVerificationStatusWorkflow from "../../../workflows/set-age-verification-status"
 
 type VerificationCallbackBody = {
@@ -56,13 +57,23 @@ export async function POST(req: MedusaRequest, res: MedusaResponse) {
   }
 
   const body = req.body as VerificationCallbackBody
-  const orderId = body.site_transaction_ref
   const status = body.status ? STATUS_MAP[body.status] : undefined
 
-  if (!orderId || !status) {
+  if (!body.site_transaction_ref || !status) {
     res.status(400).json({ message: "Invalid payload" })
     return
   }
+
+  // `site_transaction_ref` is the order's display number (see
+  // buildTransactionPayload); the record is keyed by the order id.
+  const order = await resolveOrder(req.scope, body.site_transaction_ref)
+
+  if (!order) {
+    res.status(404).json({ message: "No order matches site_transaction_ref" })
+    return
+  }
+
+  const orderId = order.id
 
   const [existing] = await ageVerificationModuleService.listAgeVerifications({
     order_id: orderId,
